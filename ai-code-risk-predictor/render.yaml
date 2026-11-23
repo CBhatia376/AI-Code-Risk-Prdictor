@@ -1,0 +1,46 @@
+# Render Blueprint: Dashboard -> New -> Blueprint -> pick this GitHub repo.
+# Creates ONE web service (React dashboard + API in the same Docker image, one URL) and a
+# PostgreSQL database, and wires DATABASE_URL automatically. Step-by-step: docs/DEPLOYMENT.md.
+# Plan names/prices change - check render.com/pricing before applying.
+services:
+  - type: web
+    name: code-risk-predictor
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # PyTorch + the emotion model need ~1.5-2 GB RAM ("standard").
+    # Cheaper: plan "starter" (512 MB) with RISK_USE_HF=0 below.
+    plan: standard
+    healthCheckPath: /api/health
+    disk:                      # keeps clones/caches between deploys (needs a paid plan)
+      name: risk-data
+      mountPath: /data
+      sizeGB: 10
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: code-risk-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true    # Render creates a long random value
+      - key: ENVIRONMENT
+        value: production
+      - key: RISK_USE_HF       # "0" on a 512 MB plan: skips the AI emotion model
+        value: "1"
+      # The dashboard link in PR comments defaults to Render's own URL (RENDER_EXTERNAL_URL);
+      # set DASHBOARD_URL only if you use a custom domain.
+      - key: DASHBOARD_URL
+        sync: false
+      # GitHub App (optional, for automatic PR comments) - see README "GitHub App".
+      - key: GITHUB_WEBHOOK_SECRET
+        sync: false
+      - key: GITHUB_APP_ID
+        sync: false
+      - key: GITHUB_PRIVATE_KEY
+        sync: false
+
+databases:
+  - name: code-risk-db
+    databaseName: risk_predictor
+    user: risk
+    plan: basic-256mb
